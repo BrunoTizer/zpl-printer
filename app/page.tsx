@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 
-const AGENT_DEFAULT_PORT = 9200; // Porta padrão do agente
+// const AGENT_DEFAULT_PORT = 9200; // Não é mais necessário se a URL do ngrok já for completa
 
 export default function HomePage() {
   // States para os dados do produto
@@ -11,9 +11,12 @@ export default function HomePage() {
   const [productBatch, setProductBatch] = useState("LOTE789");
   const [productExpiry, setProductExpiry] = useState("2025-12-31");
 
-  // States para configuração da impressão via agente
-  const [agentIp, setAgentIp] = useState("192.168.1.102"); // IP do PC onde o AGENTE está rodando
-  const [targetPrinterIp, setTargetPrinterIp] = useState("192.168.1.102"); // IP do MOCK ou da IMPRESSORA REAL
+  // State para a URL completa do agente via ngrok
+  const [ngrokAgentUrl, setNgrokAgentUrl] = useState(
+    "https://2f9c-2804-7f0-9bc0-5f3-b87b-4b29-a3e1-ca0d.ngrok-free.app" // SUA URL ATUAL DO NGROK
+  );
+  // State para o IP da impressora que será passado como query param para o agente
+  const [targetPrinterIp, setTargetPrinterIp] = useState("127.0.0.1"); // Para o mock server local
 
   // States de UI
   const [isLoading, setIsLoading] = useState(false);
@@ -41,8 +44,10 @@ export default function HomePage() {
   };
 
   const handlePrintViaAgent = async () => {
-    if (!agentIp) {
-      alert("Informe o IP do Agente Local.");
+    // Validação usando ngrokAgentUrl
+    if (!ngrokAgentUrl) {
+      // <<--- CORRIGIDO
+      alert("Informe a URL do Agente (ngrok).");
       return;
     }
     if (!targetPrinterIp) {
@@ -53,10 +58,13 @@ export default function HomePage() {
     setIsLoading(true);
     setMessage("Enviando para agente...");
     const zplCode = generateZPL();
-    const agentUrl = `http://${agentIp}:${AGENT_DEFAULT_PORT}/print?printerIp=${targetPrinterIp}`;
+
+    // Constrói a URL completa para o agente, incluindo o endpoint /print e o query parameter
+    const fullAgentUrl = `${ngrokAgentUrl}/print?printerIp=${targetPrinterIp}`; // <<--- CORRIGIDO
 
     try {
-      const response = await fetch(agentUrl, {
+      const response = await fetch(fullAgentUrl, {
+        // <<--- CORRIGIDO (usa fullAgentUrl)
         method: "POST",
         headers: { "Content-Type": "text/plain" },
         body: zplCode,
@@ -71,10 +79,10 @@ export default function HomePage() {
       }
     } catch (error: unknown) {
       let errorMsg =
-        "Falha ao conectar ao agente. Verifique o IP e se o agente está rodando.";
+        "Falha ao conectar ao agente. Verifique a URL e se o agente/túnel ngrok está rodando."; // Mensagem de erro ajustada
       if (error instanceof Error && error.message.includes("Failed to fetch")) {
         errorMsg =
-          "Falha ao conectar ao agente. O IP está correto? O agente está rodando e acessível na rede? Há um firewall bloqueando?";
+          "Falha ao conectar ao agente. A URL do ngrok está correta e ativa? O agente local está rodando?";
       } else if (error instanceof Error) {
         errorMsg = error.message;
       }
@@ -105,19 +113,22 @@ export default function HomePage() {
       >
         <h2>Configuração do Agente e Impressora</h2>
         <div>
-          <label htmlFor="agentIp">IP do Agente Local (PC na sua rede):</label>
+          {/* Input para a URL do ngrok */}
+          <label htmlFor="ngrokAgentUrl">URL do Agente (via ngrok):</label>{" "}
+          {/* <<--- CORRIGIDO */}
           <br />
           <input
             type="text"
-            id="agentIp"
-            value={agentIp}
-            onChange={(e) => setAgentIp(e.target.value)}
+            id="ngrokAgentUrl" // <<--- CORRIGIDO
+            value={ngrokAgentUrl} // <<--- CORRIGIDO
+            onChange={(e) => setNgrokAgentUrl(e.target.value)} // <<--- CORRIGIDO
             style={{ width: "90%", padding: "8px", marginBottom: "10px" }}
+            placeholder="Ex: https://xxxxxx.ngrok-free.app"
           />
         </div>
         <div>
           <label htmlFor="targetPrinterIp">
-            IP da Impressora Alvo (Mock ou Real):
+            IP da Impressora Alvo (Mock ou Real, para o agente usar):
           </label>
           <br />
           <input
@@ -126,10 +137,12 @@ export default function HomePage() {
             value={targetPrinterIp}
             onChange={(e) => setTargetPrinterIp(e.target.value)}
             style={{ width: "90%", padding: "8px" }}
+            placeholder="Ex: 127.0.0.1 (para mock local)"
           />
         </div>
       </div>
 
+      {/* ... (Restante do JSX para Dados do Produto, Botão e Mensagem permanece o mesmo) ... */}
       <div
         style={{
           marginBottom: "15px",
