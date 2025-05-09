@@ -1,103 +1,151 @@
-import Image from "next/image";
+// app/page.js
+"use client"; // Necessário para useState e event handlers
 
-export default function Home() {
+import { useState } from "react";
+
+export default function HomePage() {
+  const [printerIp, setPrinterIp] = useState("192.168.1.100");
+  const [productName, setProductName] = useState("Produto Teste");
+  const [productBatch, setProductBatch] = useState("LOTE123");
+  const [productExpiry, setProductExpiry] = useState("2024-12-31"); // Formato YYYY-MM-DD
+  const [isLoading, setIsLoading] = useState(false); // Estado para feedback de carregamento
+  const [message, setMessage] = useState(""); // Estado para mensagens de sucesso/erro
+
+  const handlePrint = async () => {
+    if (!printerIp) {
+      setMessage("Erro: Por favor, informe o IP da impressora.");
+      alert("Erro: Por favor, informe o IP da impressora."); // Manter alert por enquanto para visibilidade
+      return;
+    }
+    if (!productName || !productExpiry) {
+      setMessage("Erro: Nome do Produto e Data de Validade são obrigatórios.");
+      alert("Erro: Nome do Produto e Data de Validade são obrigatórios."); // Manter alert
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage("Enviando para impressora...");
+
+    try {
+      const response = await fetch("/api/print-simple", {
+        // Endpoint da sua API
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          printerIp,
+          productName,
+          productBatch,
+          productExpiry,
+        }),
+      });
+
+      const result = await response.json(); // Tenta parsear a resposta como JSON
+
+      if (response.ok) {
+        setMessage(`Sucesso: ${result.message}`);
+        alert(`Sucesso: ${result.message}`); // Manter alert
+      } else {
+        // A API já deve retornar um JSON com { message: "...", error: "..." }
+        const errorMsg =
+          result.error || result.message || "Erro desconhecido da API.";
+        setMessage(`Erro (${response.status}): ${errorMsg}`);
+        alert(`Erro (${response.status}): ${errorMsg}`); // Manter alert
+      }
+    } catch (error: unknown) {
+      console.error("Erro no fetch:", error);
+      let errorMsg = "Erro ao tentar comunicar com a API.";
+      if (error instanceof Error) {
+        errorMsg = error.message;
+      }
+      setMessage(`Erro de comunicação: ${errorMsg}`);
+      alert(`Erro de comunicação: ${errorMsg}`); // Manter alert
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div style={{ padding: "20px", fontFamily: "Arial" }}>
+      <h1>Impressão ZPL Simples</h1>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+      <div style={{ marginBottom: "20px" }}>
+        <label htmlFor="printerIp">IP da Impressora:</label>
+        <br />
+        <input
+          type="text"
+          id="printerIp"
+          value={printerIp}
+          onChange={(e) => setPrinterIp(e.target.value)}
+          disabled={isLoading}
+          style={{ border: "1px solid #ccc", padding: "8px", width: "200px" }}
+        />
+      </div>
+
+      <div style={{ marginBottom: "10px" }}>
+        <label htmlFor="productName">Nome do Produto:</label>
+        <br />
+        <input
+          type="text"
+          id="productName"
+          value={productName}
+          onChange={(e) => setProductName(e.target.value)}
+          disabled={isLoading}
+          style={{ border: "1px solid #ccc", padding: "8px", width: "300px" }}
+        />
+      </div>
+
+      <div style={{ marginBottom: "10px" }}>
+        <label htmlFor="productBatch">Lote:</label>
+        <br />
+        <input
+          type="text"
+          id="productBatch"
+          value={productBatch}
+          onChange={(e) => setProductBatch(e.target.value)}
+          disabled={isLoading}
+          style={{ border: "1px solid #ccc", padding: "8px", width: "200px" }}
+        />
+      </div>
+
+      <div style={{ marginBottom: "20px" }}>
+        <label htmlFor="productExpiry">Data de Validade (YYYY-MM-DD):</label>
+        <br />
+        <input
+          type="date" // Usa o seletor de data do navegador
+          id="productExpiry"
+          value={productExpiry}
+          onChange={(e) => setProductExpiry(e.target.value)}
+          disabled={isLoading}
+          style={{ border: "1px solid #ccc", padding: "8px", width: "200px" }}
+        />
+      </div>
+
+      <button
+        onClick={handlePrint}
+        disabled={isLoading} // Desabilita o botão durante o carregamento
+        style={{
+          padding: "10px 20px",
+          backgroundColor: isLoading ? "grey" : "blue", // Muda a cor quando carregando
+          color: "white",
+          border: "none",
+          cursor: isLoading ? "not-allowed" : "pointer",
+        }}
+      >
+        {isLoading ? "Imprimindo..." : "IMPRIMIR ETIQUETA"}
+      </button>
+      {/* Exibe a mensagem de status/erro */}
+      {message && (
+        <p
+          style={{
+            marginTop: "15px",
+            color: message.startsWith("Erro") ? "red" : "green",
+          }}
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          {message}
+        </p>
+      )}
     </div>
   );
 }
