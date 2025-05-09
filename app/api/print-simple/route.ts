@@ -107,8 +107,11 @@ export async function POST(req: NextRequest) {
       errorMessage = error.message;
       // Verifica se o erro tem uma propriedade 'code' (comum em erros de sistema como os do 'net')
       // NodeJS.ErrnoException é um tipo que estende Error e tem 'code'
-      if ("code" in error && typeof (error as any).code === "string") {
-        errorCode = (error as any).code;
+      if (
+        "code" in error &&
+        typeof (error as NodeJS.ErrnoException).code === "string"
+      ) {
+        errorCode = (error as NodeJS.ErrnoException).code;
       }
     } else {
       // Se não for uma instância de Error, tenta converter para string
