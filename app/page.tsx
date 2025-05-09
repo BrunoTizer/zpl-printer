@@ -1,146 +1,204 @@
-// app/page.js
-"use client"; // Necessário para useState e event handlers
+// frontend-nextjs/app/page.tsx
+"use client";
 
 import { useState } from "react";
 
-export default function HomePage() {
-  const [printerIp, setPrinterIp] = useState("192.168.1.100");
-  const [productName, setProductName] = useState("Produto Teste");
-  const [productBatch, setProductBatch] = useState("LOTE123");
-  const [productExpiry, setProductExpiry] = useState("2024-12-31"); // Formato YYYY-MM-DD
-  const [isLoading, setIsLoading] = useState(false); // Estado para feedback de carregamento
-  const [message, setMessage] = useState(""); // Estado para mensagens de sucesso/erro
+const AGENT_DEFAULT_PORT = 9200; // Porta padrão do agente
 
-  const handlePrint = async () => {
-    if (!printerIp) {
-      setMessage("Erro: Por favor, informe o IP da impressora.");
-      alert("Erro: Por favor, informe o IP da impressora."); // Manter alert por enquanto para visibilidade
+export default function HomePage() {
+  // States para os dados do produto
+  const [productName, setProductName] = useState("Produto Exemplo");
+  const [productBatch, setProductBatch] = useState("LOTE789");
+  const [productExpiry, setProductExpiry] = useState("2025-12-31");
+
+  // States para configuração da impressão via agente
+  const [agentIp, setAgentIp] = useState("192.168.1.102"); // IP do PC onde o AGENTE está rodando
+  const [targetPrinterIp, setTargetPrinterIp] = useState("192.168.1.102"); // IP do MOCK ou da IMPRESSORA REAL
+
+  // States de UI
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const generateZPL = () => {
+    let formattedExpiry = productExpiry;
+    if (productExpiry && productExpiry.includes("-")) {
+      const parts = productExpiry.split("-");
+      if (parts.length === 3)
+        formattedExpiry = `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return `
+^XA
+^CI28
+^FO50,50^A0N,35,35^FDProd: ${
+      productName ? productName.substring(0, 20) : "N/A"
+    }^FS
+^FO50,100^A0N,30,30^FDLote: ${
+      productBatch ? productBatch.substring(0, 15) : "N/A"
+    }^FS
+^FO50,150^A0N,30,30^FDVal: ${formattedExpiry || "N/A"}^FS
+^XZ
+`;
+  };
+
+  const handlePrintViaAgent = async () => {
+    if (!agentIp) {
+      alert("Informe o IP do Agente Local.");
       return;
     }
-    if (!productName || !productExpiry) {
-      setMessage("Erro: Nome do Produto e Data de Validade são obrigatórios.");
-      alert("Erro: Nome do Produto e Data de Validade são obrigatórios."); // Manter alert
+    if (!targetPrinterIp) {
+      alert("Informe o IP da Impressora Alvo (Mock ou Real).");
       return;
     }
 
     setIsLoading(true);
-    setMessage("Enviando para impressora...");
+    setMessage("Enviando para agente...");
+    const zplCode = generateZPL();
+    const agentUrl = `http://${agentIp}:${AGENT_DEFAULT_PORT}/print?printerIp=${targetPrinterIp}`;
 
     try {
-      const response = await fetch("/api/print-simple", {
-        // Endpoint da sua API
+      const response = await fetch(agentUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          printerIp,
-          productName,
-          productBatch,
-          productExpiry,
-        }),
+        headers: { "Content-Type": "text/plain" },
+        body: zplCode,
       });
-
-      const result = await response.json(); // Tenta parsear a resposta como JSON
-
+      const result = await response.json();
       if (response.ok) {
-        setMessage(`Sucesso: ${result.message}`);
-        alert(`Sucesso: ${result.message}`); // Manter alert
+        setMessage(`Agente: ${result.message}`);
       } else {
-        // A API já deve retornar um JSON com { message: "...", error: "..." }
-        const errorMsg =
-          result.error || result.message || "Erro desconhecido da API.";
-        setMessage(`Erro (${response.status}): ${errorMsg}`);
-        alert(`Erro (${response.status}): ${errorMsg}`); // Manter alert
+        setMessage(
+          `Erro Agente (${response.status}): ${result.error || result.message}`
+        );
       }
     } catch (error: unknown) {
-      console.error("Erro no fetch:", error);
-      let errorMsg = "Erro ao tentar comunicar com a API.";
-      if (error instanceof Error) {
+      let errorMsg =
+        "Falha ao conectar ao agente. Verifique o IP e se o agente está rodando.";
+      if (error instanceof Error && error.message.includes("Failed to fetch")) {
+        errorMsg =
+          "Falha ao conectar ao agente. O IP está correto? O agente está rodando e acessível na rede? Há um firewall bloqueando?";
+      } else if (error instanceof Error) {
         errorMsg = error.message;
       }
-      setMessage(`Erro de comunicação: ${errorMsg}`);
-      alert(`Erro de comunicação: ${errorMsg}`); // Manter alert
+      setMessage(`Erro: ${errorMsg}`);
+      console.error("Erro ao enviar para o agente:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial" }}>
-      <h1>Impressão ZPL Simples</h1>
+    <div
+      style={{
+        padding: "20px",
+        fontFamily: "Arial",
+        maxWidth: "600px",
+        margin: "auto",
+      }}
+    >
+      <h1>Impressão ZPL via Agente Local</h1>
 
-      <div style={{ marginBottom: "20px" }}>
-        <label htmlFor="printerIp">IP da Impressora:</label>
-        <br />
-        <input
-          type="text"
-          id="printerIp"
-          value={printerIp}
-          onChange={(e) => setPrinterIp(e.target.value)}
-          disabled={isLoading}
-          style={{ border: "1px solid #ccc", padding: "8px", width: "200px" }}
-        />
+      <div
+        style={{
+          marginBottom: "15px",
+          border: "1px solid #eee",
+          padding: "10px",
+        }}
+      >
+        <h2>Configuração do Agente e Impressora</h2>
+        <div>
+          <label htmlFor="agentIp">IP do Agente Local (PC na sua rede):</label>
+          <br />
+          <input
+            type="text"
+            id="agentIp"
+            value={agentIp}
+            onChange={(e) => setAgentIp(e.target.value)}
+            style={{ width: "90%", padding: "8px", marginBottom: "10px" }}
+          />
+        </div>
+        <div>
+          <label htmlFor="targetPrinterIp">
+            IP da Impressora Alvo (Mock ou Real):
+          </label>
+          <br />
+          <input
+            type="text"
+            id="targetPrinterIp"
+            value={targetPrinterIp}
+            onChange={(e) => setTargetPrinterIp(e.target.value)}
+            style={{ width: "90%", padding: "8px" }}
+          />
+        </div>
       </div>
 
-      <div style={{ marginBottom: "10px" }}>
-        <label htmlFor="productName">Nome do Produto:</label>
-        <br />
-        <input
-          type="text"
-          id="productName"
-          value={productName}
-          onChange={(e) => setProductName(e.target.value)}
-          disabled={isLoading}
-          style={{ border: "1px solid #ccc", padding: "8px", width: "300px" }}
-        />
-      </div>
-
-      <div style={{ marginBottom: "10px" }}>
-        <label htmlFor="productBatch">Lote:</label>
-        <br />
-        <input
-          type="text"
-          id="productBatch"
-          value={productBatch}
-          onChange={(e) => setProductBatch(e.target.value)}
-          disabled={isLoading}
-          style={{ border: "1px solid #ccc", padding: "8px", width: "200px" }}
-        />
-      </div>
-
-      <div style={{ marginBottom: "20px" }}>
-        <label htmlFor="productExpiry">Data de Validade (YYYY-MM-DD):</label>
-        <br />
-        <input
-          type="date" // Usa o seletor de data do navegador
-          id="productExpiry"
-          value={productExpiry}
-          onChange={(e) => setProductExpiry(e.target.value)}
-          disabled={isLoading}
-          style={{ border: "1px solid #ccc", padding: "8px", width: "200px" }}
-        />
+      <div
+        style={{
+          marginBottom: "15px",
+          border: "1px solid #eee",
+          padding: "10px",
+        }}
+      >
+        <h2>Dados do Produto</h2>
+        <div>
+          <label htmlFor="productName">Nome do Produto:</label>
+          <br />
+          <input
+            type="text"
+            id="productName"
+            value={productName}
+            onChange={(e) => setProductName(e.target.value)}
+            style={{ width: "90%", padding: "8px", marginBottom: "10px" }}
+          />
+        </div>
+        <div>
+          <label htmlFor="productBatch">Lote:</label>
+          <br />
+          <input
+            type="text"
+            id="productBatch"
+            value={productBatch}
+            onChange={(e) => setProductBatch(e.target.value)}
+            style={{ width: "90%", padding: "8px", marginBottom: "10px" }}
+          />
+        </div>
+        <div>
+          <label htmlFor="productExpiry">Data de Validade:</label>
+          <br />
+          <input
+            type="date"
+            id="productExpiry"
+            value={productExpiry}
+            onChange={(e) => setProductExpiry(e.target.value)}
+            style={{ width: "90%", padding: "8px" }}
+          />
+        </div>
       </div>
 
       <button
-        onClick={handlePrint}
-        disabled={isLoading} // Desabilita o botão durante o carregamento
+        onClick={handlePrintViaAgent}
+        disabled={isLoading}
         style={{
-          padding: "10px 20px",
-          backgroundColor: isLoading ? "grey" : "blue", // Muda a cor quando carregando
+          padding: "12px 25px",
+          backgroundColor: isLoading ? "grey" : "dodgerblue",
           color: "white",
           border: "none",
-          cursor: isLoading ? "not-allowed" : "pointer",
+          borderRadius: "5px",
+          cursor: "pointer",
+          fontSize: "16px",
         }}
       >
-        {isLoading ? "Imprimindo..." : "IMPRIMIR ETIQUETA"}
+        {isLoading ? "Enviando..." : "Imprimir via Agente"}
       </button>
-      {/* Exibe a mensagem de status/erro */}
+
       {message && (
         <p
           style={{
             marginTop: "15px",
-            color: message.startsWith("Erro") ? "red" : "green",
+            padding: "10px",
+            backgroundColor: message.startsWith("Erro") ? "#ffebee" : "#e8f5e9",
+            color: message.startsWith("Erro") ? "#c62828" : "#2e7d32",
+            border: `1px solid ${
+              message.startsWith("Erro") ? "#c62828" : "#2e7d32"
+            }`,
           }}
         >
           {message}
